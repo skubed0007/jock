@@ -1,295 +1,263 @@
 use std::{
     env::args,
     fs::{self, File},
-    io::{self, stdout, BufReader, BufWriter, Read, Write},
+    io::{self, stdin, stdout, BufWriter, Write},
     path::{Path, PathBuf},
-    process::Command,
-    time::Duration,
 };
 
-use indicatif::ProgressBar; // Import ProgressBar for spinner
+use indicatif::{ProgressBar, ProgressStyle};
 
 #[derive(Debug)]
 pub enum JockError {
     Io(io::Error),
-    InvalidCommand(String),
     PathNotFound(PathBuf),
-    OutputError(String),
-    CryptoError,
+    InvalidFormat,
+    EncryptionNotAllowedForFolder,
 }
 
+const EXTENSION_SIZE: usize = 5;
+const BUFFER_SIZE: usize = 8192; // Buffer size for file operations
+
 fn main() {
-    clear_screen(); // Clear the screen at the start
-
-    let a: Vec<String> = args().collect();
-
-    // Check for help or incorrect argument count
-    if a.len() < 2 || a[1] == "--help" || a[1] == "-h" {
+    let args: Vec<String> = args().collect();
+    
+    // Check for help flag or insufficient arguments
+    if args.len() < 2 || args[1].eq_ignore_ascii_case("--help") || args[1].eq_ignore_ascii_case("-h") {
         print_help();
         return;
     }
 
-    let cmd = &a[1];
+    let command = &args[1];
 
-    match cmd.as_str() {
-        "lock" | "open" => {
-            if a.len() < 4 {
-                eprintln!("Error: Missing password or target.");
-                return;
-            }
-            let pwd = a[2].as_bytes();
-            let targets: Vec<&str> = a[3..].iter().map(|s| s.as_str()).collect();
-            let hp = hash_password(pwd);
+    if command == "cli" {
+        climode();
+        return;
+    }
 
-            let op = if a.len() >= 6 && a[4] == "--output" {
-                Some(a[5].clone())
+    let password = &args[2];
+    let file_path = Path::new(&args[3]);
+    let hashed_password = hash_password(password.as_bytes());
+
+    if file_path.is_dir() {
+        eprintln!("Error: Folder encryption is currently not supported. Please specify a file.");
+        return;
+    }
+
+    match command.as_str() {
+        "lock" => {
+            let output_file = format!("{}.jock", file_path.file_stem().unwrap().to_string_lossy());
+            println!("Encrypting file: {}", file_path.display());
+            if let Err(e) = encrypt_file(file_path, &hashed_password, &output_file) {
+                eprintln!("Error encrypting file: {:?}", e);
             } else {
-                None
-            };
-
-            // Process each target
-            for tgt in targets {
-                match cmd.as_str() {
-                    "lock" => {
-                        if let Err(e) = process_target(tgt, &hp, true, op.clone()) {
-                            eprintln!("Error processing target '{}': {:?}", tgt, e);
-                        }
-                    }
-                    "open" => {
-                        if let Err(e) = process_target(tgt, &hp, false, op.clone()) {
-                            eprintln!("Error processing target '{}': {:?}", tgt, e);
-                        }
-                    }
-                    _ => {
-                        let error = JockError::InvalidCommand(cmd.clone());
-                        eprintln!("Error: {:?}", error);
-                    }
-                }
+                println!("File encrypted successfully. Output file: {}", output_file);
             }
         }
-        "cli" => {
-            handle_cli(); // Directly call the CLI mode without additional arguments
+        "open" => {
+            println!("Decrypting file: {}", file_path.display());
+            if let Err(e) = decrypt_file(file_path, &hashed_password) {
+                eprintln!("Error decrypting file: {:?}", e);
+            }
         }
-        _ => {
-            let error = JockError::InvalidCommand(cmd.clone());
-            eprintln!("Error: {:?}", error);
-        }
+        _ => eprintln!("Invalid command. Use 'lock' to encrypt or 'open' to decrypt.\nYou gave me: {}", command),
     }
 }
 
+// Help function to print usage information
 fn print_help() {
-    println!("\nUsage: jock <lock|open|cli> <password> <file_or_folder_or_message>... [--output <output_file>]");
+    println!("Usage: jock <command> <password> <file_path>");
     println!("Commands:");
-    println!("  lock         Encrypts the specified files, folders, or messages using the provided password.");
-    println!("  open         Decrypts the specified files or folders using the provided password.");
-    println!("  cli          Encrypts or decrypts messages interactively.");
-    println!("Arguments:");
-    println!("  <password>   A password to secure your encryption or decryption process.");
-    println!("  <file_or_folder_or_message> The paths of files or folders to encrypt or decrypt, or messages to encrypt.");
+    println!("  lock         Encrypts the specified file using the provided password.");
+    println!("  open         Decrypts the specified file using the provided password.");
+    println!("  cli          Enter interactive mode for encrypting or decrypting messages.");
     println!("Options:");
-    println!("  --output <output_file> Specify a custom output file path. If not provided, the original files will be saved with the .jock extension.");
-    println!("Example:");
-    println!("  jock lock mypassword /path/to/file1 /path/to/file2 \"This is a message\" --output /path/to/encrypted_file");
+    println!("  --help, -h   Show this help message.");
+    println!("\nExamples:");
+    println!("  jock lock mypassword /path/to/myfile.txt");
+    println!("  jock open mypassword /path/to/myfile.jock");
+    println!("  jock cli");
 }
 
-fn hash_password(p: &[u8]) -> Vec<u8> {
-    p.iter().map(|&b| b.wrapping_mul(3).wrapping_add(7)).collect()
+fn hash_password(password: &[u8]) -> Vec<u8> {
+    password.iter().map(|&b| b.wrapping_mul(3).wrapping_add(7)).collect()
 }
 
-fn encrypt(data: &[u8], hp: &[u8]) -> Vec<u8> {
+fn encrypt(data: &[u8], hashed_password: &[u8]) -> Vec<u8> {
     data.iter()
         .enumerate()
-        .map(|(i, &b)| b.wrapping_add(hp[i % hp.len()]))
+        .map(|(i, &byte)| byte.wrapping_add(hashed_password[i % hashed_password.len()]))
         .collect()
 }
 
-fn decrypt(data: &[u8], hp: &[u8]) -> Vec<u8> {
+fn decrypt(data: &[u8], hashed_password: &[u8]) -> Vec<u8> {
     data.iter()
         .enumerate()
-        .map(|(i, &b)| b.wrapping_sub(hp[i % hp.len()]))
+        .map(|(i, &byte)| byte.wrapping_sub(hashed_password[i % hashed_password.len()]))
         .collect()
 }
 
-fn handle_cli() {
-    clear_screen(); // Clear the screen when entering CLI mode
-    let stdin = io::stdin();
-    loop {
-        let mut input = String::new();
-        println!("Enter a message to encrypt or decrypt (or 'exit' to quit):");
-        print!("> ");
-        stdout().flush().unwrap();
-        stdin.read_line(&mut input).expect("Failed to read line");
-        let input = input.trim();
+fn encrypt_file(path: &Path, hashed_password: &[u8], output_file: &str) -> Result<(), JockError> {
+    let data = fs::read(&path).map_err(JockError::Io)?;
+    let total_size = data.len();
+    let encrypted_data = encrypt(&data, hashed_password);
 
-        if input.eq_ignore_ascii_case("exit") {
-            break; // Exit the loop if the user types 'exit'
-        }
+    // Create progress bar
+    let pb = ProgressBar::new(total_size as u64);
+    pb.set_style(ProgressStyle::with_template("{msg} {bar:40} {bytes}/{total_bytes} ({eta})").unwrap());
 
-        // Prompt for action
-        println!("Choose action (lock to encrypt / open to decrypt):");
-        print!("> ");
-        stdout().flush().unwrap();
+    // Write encrypted data to output file
+    let mut output = BufWriter::new(File::create(output_file).map_err(JockError::Io)?);
+    let mut bytes_written = 0;
 
-        let mut action = String::new();
-        stdin.read_line(&mut action).expect("Failed to read line");
-        let action = action.trim();
+    // Write data in chunks
+    while bytes_written < encrypted_data.len() {
+        let chunk_size = std::cmp::min(BUFFER_SIZE, encrypted_data.len() - bytes_written);
+        output.write_all(&encrypted_data[bytes_written..bytes_written + chunk_size]).map_err(JockError::Io)?;
+        bytes_written += chunk_size;
 
-        match action {
-            "lock" => {
-                println!("Enter password for encryption:");
-                print!("> ");
-                stdout().flush().unwrap();
-
-                let mut password = String::new();
-                stdin.read_line(&mut password).expect("Failed to read line");
-                let hp = hash_password(password.trim().as_bytes());
-                let encrypted_message = encrypt(input.as_bytes(), &hp);
-                let output = String::from_utf8_lossy(&encrypted_message);
-                println!("Encrypted message: {}", output);
-            }
-            "open" => {
-                println!("Enter password for decryption:");
-                print!("{}","> ");
-                stdout().flush().unwrap();
-
-                let mut password = String::new();
-                stdin.read_line(&mut password).expect("Failed to read line");
-                let hp = hash_password(password.trim().as_bytes());
-                let decrypted_message = decrypt(input.as_bytes(), &hp);
-                let output = String::from_utf8_lossy(&decrypted_message);
-                println!("Decrypted message: {}", output);
-            }
-            _ => {
-                eprintln!("Invalid action. Please type 'lock' or 'open'.");
-            }
-        }
+        // Update progress bar
+        pb.set_message("Encrypting...");
+        pb.set_position(bytes_written as u64);
     }
-}
 
-fn clear_screen() {
-    // Clear the screen based on the operating system
-    if let Ok(_) = Command::new("clear").status() {
-        Command::new("clear").status().unwrap();
-    } else {
-        Command::new("cls").status().unwrap();
-    }
-}
+    // Finalize progress bar
+    pb.finish_with_message("Encryption complete!");
 
-fn process_target(tgt: &str, hp: &[u8], enc_mode: bool, op: Option<String>) -> Result<(), JockError> {
-    let p = Path::new(tgt);
-    let spinner = ProgressBar::new_spinner();
+    let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+    let extension_bytes = extension.as_bytes();
+    let extension_len = extension_bytes.len().min(EXTENSION_SIZE);
 
-    if p.is_dir() {
-        // Collect entries to avoid moving value
-        let entries: Vec<_> = fs::read_dir(p).map_err(JockError::Io)?.collect();
+    // Write the file extension
+    let mut extension_buffer = vec![0u8; EXTENSION_SIZE];
+    extension_buffer[..extension_len].copy_from_slice(&extension_bytes[..extension_len]);
+    output.write_all(&extension_buffer).map_err(JockError::Io)?;
 
-        for entry in entries {
-            let f_path = entry.map_err(JockError::Io)?.path();
-            if f_path.is_file() {
-                let output_file = op.clone().unwrap_or_else(|| {
-                    let mut o = f_path.clone();
-                    if enc_mode {
-                        o.set_extension("jock");
-                    }
-                    o.to_string_lossy().into_owned()
-                });
+    // Delete the original file after successful encryption
+    fs::remove_file(path).map_err(JockError::Io)?;
+    println!("Original file deleted after encryption.");
 
-                spinner.set_message(format!("Processing file: '{}'", f_path.display()));
-                spinner.enable_steady_tick(Duration::from_millis(50)); // Show steady spinning
-
-                // Process each file without threading
-                if let Err(e) = process_file(&f_path, hp, enc_mode, Some(output_file)) {
-                    eprintln!(
-                        "Error processing file '{}': {:?}",
-                        f_path.display(),
-                        e
-                    );
-                }
-
-                // Finish the spinner
-                spinner.finish_with_message(format!("Done processing file '{}'", f_path.display()));
-            }
-        }
-    } else if p.is_file() {
-        // Process the single file
-        let output_file = op.clone().unwrap_or_else(|| {
-            let mut o = p.to_path_buf();
-            if enc_mode {
-                o.set_extension("jock");
-            }
-            o.to_string_lossy().into_owned()
-        });
-        
-        spinner.set_message(format!("Processing file: '{}'", p.display()));
-        spinner.enable_steady_tick(Duration::from_millis(50)); // Show steady spinning
-
-        if let Err(e) = process_file(p, hp, enc_mode, Some(output_file)) {
-            eprintln!(
-                "Error processing file '{}': {:?}",
-                p.display(),
-                e
-            );
-        }
-
-        // Finish the spinner
-        spinner.finish_with_message(format!("Done processing file '{}'", p.display()));
-    } else {
-        // If the target is not a path, treat it as a message
-        if enc_mode {
-            // If locking, encrypt the message
-            let encrypted_message = encrypt(tgt.as_bytes(), hp);
-            let output = String::from_utf8_lossy(&encrypted_message);
-            println!("Encrypted message: {}", output);
-        } else {
-            // If opening, we cannot decrypt a message without a file
-            return Err(JockError::PathNotFound(p.to_path_buf()));
-        }
-    }
     Ok(())
 }
 
-fn process_file(fp: &Path, hp: &[u8], enc_mode: bool, mut opf: Option<String>) -> Result<(), JockError> {
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_message(format!("Reading file: '{}'", fp.display()));
-    spinner.enable_steady_tick(Duration::from_millis(50)); // Show steady spinning
+fn decrypt_file(encrypted_file: &Path, hashed_password: &[u8]) -> Result<(), JockError> {
+    let data = fs::read(encrypted_file).map_err(JockError::Io)?;
+    let total_size = data.len();
 
-    let mut f = BufReader::new(File::open(fp).map_err(JockError::Io)?);
-    let mut data = Vec::new();
-    let _total_size = f.read_to_end(&mut data).map_err(JockError::Io)?;
-    spinner.finish_with_message("File read successfully.");
-
-    // Choose to encrypt or decrypt based on enc_mode
-    let output = if enc_mode {
-        spinner.set_message("Encrypting data...");
-        let mut enc_data = encrypt(&data, hp);
-        if let Some(ext) = fp.extension() {
-            let ext_data = format!("\0{}", ext.to_string_lossy());
-            enc_data.extend_from_slice(ext_data.as_bytes());
-        }
-        enc_data
+    // Read the extension and decrypt the data
+    let extension_bytes = if total_size >= EXTENSION_SIZE {
+        &data[(total_size - EXTENSION_SIZE)..]
     } else {
-        spinner.set_message("Decrypting data...");
-        let mut dec_data = decrypt(&data[..data.len() - 1], hp);
-        let ext_start = data.len().saturating_sub(1024);
-        if let Some(delim_index) = data[ext_start..].iter().rposition(|&x| x == 0) {
-            let orig_ext = String::from_utf8_lossy(&data[ext_start + delim_index + 1..]).to_string();
-            dec_data.truncate(ext_start + delim_index);
-            if let Some(ref mut out_path) = opf {
-                out_path.push_str(&format!(".{}", orig_ext));
-            }
-        }
-        dec_data
+        &data[..total_size]
     };
 
-    // Write output to the specified file
-    if let Some(out_fp) = opf {
-        spinner.set_message(format!("Writing output to: '{}'", out_fp));
-        let mut out = BufWriter::new(File::create(&out_fp).map_err(JockError::Io)?);
-        out.write_all(&output).map_err(JockError::Io)?;
-        spinner.finish_with_message("Output written successfully.");
-    } else {
-        return Err(JockError::OutputError("No output file specified.".into()));
+    let extension_length = extension_bytes.iter().position(|&b| b == 0).unwrap_or(extension_bytes.len());
+    let file_extension = std::str::from_utf8(&extension_bytes[..extension_length]).unwrap_or("");
+
+    let decrypted_data = decrypt(&data[..total_size - EXTENSION_SIZE], hashed_password);
+
+    // Create the new output file name by replacing the .jock extension with the retrieved extension
+    let new_output_file = encrypted_file.with_extension(file_extension);
+
+    // Create progress bar for decryption
+    let pb = ProgressBar::new(decrypted_data.len() as u64);
+    pb.set_style(ProgressStyle::with_template("{msg} {bar:40} {bytes}/{total_bytes} ({eta})").unwrap());
+
+    // Write the decrypted data to the new file
+    let mut output = BufWriter::new(File::create(&new_output_file).map_err(JockError::Io)?);
+    let mut bytes_written = 0;
+
+    // Write data in chunks
+    while bytes_written < decrypted_data.len() {
+        let chunk_size = std::cmp::min(BUFFER_SIZE, decrypted_data.len() - bytes_written);
+        output.write_all(&decrypted_data[bytes_written..bytes_written + chunk_size]).map_err(JockError::Io)?;
+        bytes_written += chunk_size;
+
+        // Update progress bar
+        pb.set_message("Decrypting...");
+        pb.set_position(bytes_written as u64);
     }
 
+    // Finalize progress bar
+    pb.finish_with_message("Decryption complete!");
+
+    // Delete the original encrypted file
+    fs::remove_file(encrypted_file).map_err(JockError::Io)?;
+    println!("Encrypted file deleted after decryption.");
+
+    println!("Decrypted file created: '{}'", new_output_file.display());
     Ok(())
+}
+
+fn climode() {
+    loop {
+        println!("\n=================================");
+        println!(" Welcome to the Encryption System ");
+        println!("=================================");
+        
+        println!("Please choose an action:");
+        println!("1. Encrypt a message");
+        println!("2. Decrypt a message");
+        println!("3. Exit");
+        print!("> ");
+        stdout().flush().unwrap();
+
+        let mut choice = String::new();
+        stdin().read_line(&mut choice).unwrap();
+        
+        match choice.trim() {
+            "1" => {
+                println!("Enter the message to encrypt:");
+                print!("> ");
+                stdout().flush().unwrap();
+                let mut msg = String::new();
+                stdin().read_line(&mut msg).unwrap();
+
+                println!("Enter your password for encryption:");
+                print!("> ");
+                stdout().flush().unwrap();
+                let mut password = String::new();
+                stdin().read_line(&mut password).unwrap();
+
+                let hashed_password = hash_password(password.trim().as_bytes());
+                let encrypted_msg = encrypt(msg.trim().as_bytes(), &hashed_password);
+
+                println!("\n===============================");
+                println!(" Encrypted Message ");
+                println!("===============================\n");
+                println!("{:?}", String::from_utf8_lossy(&encrypted_msg));
+                println!("\n===============================");
+            }
+            "2" => {
+                println!("Enter the encrypted message:");
+                print!("> ");
+                stdout().flush().unwrap();
+                let mut encrypted_msg = String::new();
+                stdin().read_line(&mut encrypted_msg).unwrap();
+
+                println!("Enter your password for decryption:");
+                print!("> ");
+                stdout().flush().unwrap();
+                let mut password = String::new();
+                stdin().read_line(&mut password).unwrap();
+
+                let hashed_password = hash_password(password.trim().as_bytes());
+                
+                // Decrypting the message
+                let decrypted_msg = decrypt(encrypted_msg.trim().as_bytes(), &hashed_password);
+                println!("{:?}", decrypted_msg);
+                println!("\n===============================");
+                println!(" Decrypted Message ");
+                println!("===============================\n");
+                println!("{}", String::from_utf8_lossy(&decrypted_msg));
+                println!("\n===============================");
+            }
+            "3" => {
+                println!("Exiting the program. Goodbye!");
+                break;
+            }
+            _ => {
+                println!("Invalid option, please try again.");
+            }
+        }
+    }
 }

@@ -7,7 +7,7 @@
 
 ## Features
 
-- **Encrypt and Decrypt**: Securely encrypt files or folders using a password.
+- **Encrypt and Decrypt**: Securely encrypt files using a password.
 - **Interactive CLI**: An interactive mode for quickly encrypting or decrypting messages.
 - **Progress Indication**: Provides a visual spinner to indicate progress during operations.
 - **Custom Output**: Option to specify custom output filenames for encrypted files.
@@ -51,7 +51,7 @@
 ### Arguments
 
 - `<password>`: A password to secure the encryption or decryption process.
-- `<file_or_folder_or_message>`: The paths of files or folders to encrypt or decrypt, or messages to encrypt.
+- `<file_or_message>`: The paths of files or folders to encrypt or decrypt, or messages to encrypt.
 - `--output <output_file>`: Specify a custom output file path. If not provided, the original files will be saved with a `.jock` extension.
 
 ### Examples
@@ -75,7 +75,7 @@
    jock cli
    ```
 
-> #### YOU CAN ALSO LOCK FOLDERS BY PASSING IN FOLDERS INSTEAD OF FILES!
+> #### Folder Encryption In Work
 
 ## License
 
