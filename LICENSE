@@ -1,0 +1,158 @@
+                     GNU GENERAL PUBLIC LICENSE
+                        Version 3, 29 June 2007
+
+ Copyright (C) 2024 Jaytirth Kundan <joy0094@proton.me>
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+                       Preamble
+
+  The GNU General Public License is a free, copyleft license for
+software and other kinds of works.  This version of the License
+is intended to guarantee your freedom to share and change all
+versions of a program--to make sure it remains free software for
+all its users.
+
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that
+you have the freedom to distribute copies of free software (and
+charge for this service if you wish), that you receive source code
+or can get it if you want it, that you can change the software and
+use pieces of it in new free programs, and that you are informed
+that you can do these things.
+
+  To protect your rights, we need to make restrictions that forbid
+anyone to deny you these rights or to ask you to surrender the
+rights.  These restrictions translate to certain responsibilities
+for you if you distribute copies of the software, or if you modify
+it.
+
+  For example, if you distribute copies of such a program, whether
+gratis or for a fee, you must pass on to the recipients the same
+rights that you received.  You must make sure that they, too, receive
+or can get the source code.  And you must show them these terms so
+they know their rights.
+
+  Developers that use the GPL protect your rights with two steps:
+(1) assert copyright on the software, and (2) offer you this License
+giving you legal permission to copy, distribute, and/or modify it.
+
+  For the developers' and authors' sake, the GPL ensures that all
+other developers also share these freedoms.  For the users' sake, it
+ensures that every user is equally free to share and change all
+versions of a program--to make sure it remains free software for all
+its users.
+
+  The precise terms and conditions for copying, distribution, and
+modification follow.
+
+                     TERMS AND CONDITIONS
+
+  0. Definitions.
+
+  “This License” refers to version 3 of the GNU General Public License.
+
+  “Copyright” also means copyright-like laws that apply to other
+kinds of works, such as semiconductor masks.
+
+  “The Program” refers to any copyrightable work licensed under this
+License. Each licensee is addressed as “you”. “Licensees” and
+“recipients” may be individuals or organizations.
+
+  To “modify” a work means to copy from or adapt all or part of it
+in a fashion requiring copyright permission, other than the making
+of an exact copy. The resulting work is called a “modified version”
+of the earlier work or a work “based on” the earlier work.
+
+  A “covered work” means either the unmodified Program or a modified
+version. 
+  A “contributor” is a copyright holder who authorizes use under this
+License of the Program or a covered work.
+
+  “You” and “your” refer to the individual or entity exercising this
+License.
+
+  “Source code” for a work means the preferred form of the work for
+making modifications to it. “Object code” means any non-source form
+of a work.
+
+  “Distribution” means making available to the general public a copy
+of the Program or a covered work, whether for a fee or for free.
+  “Convey” means to make available to the public, with or without
+the intention of making a profit. 
+  A “secondary license” is a license that permits you to convey a
+covered work under different terms.
+
+  1. Source Code.
+
+  The Program must include a copy of this License and the source code
+of the Program, in one of the following ways:
+  a. The Program must be available to everyone under the same terms
+as this License, along with a prominent notice stating that the
+Program is licensed under the GPL.
+  b. The Program must be available to everyone under this License
+in its entirety, including its source code. This means that if you
+distribute a binary version of the Program, you must also provide
+access to its source code, either by including it in the same
+distribution or by providing a written offer to obtain the source code
+for a period of at least three years.
+
+  2. Basic Permissions.
+
+  You may copy, distribute and modify the Program as long as you
+conform to the terms of this License. In particular, you must:
+  a. Keep intact all copyright notices for the Program.
+  b. Distribute copies of the Program so that everyone else can
+get the same permissions you received. 
+  c. In case you modify the Program, you must keep all notices
+in the Program that inform everyone else of the license terms.
+  d. Keep intact all copyright notices and other information
+about who provided the Program to you.
+  e. Ensure that everyone who receives a copy of the Program can
+also receive the source code.
+
+  3. Copyleft.
+
+  You must distribute your modified version under the same License as
+the original Program. If you do not distribute the Program in this
+manner, you must cease to use and distribute it.
+
+  4. Conveying Non-Source Forms.
+
+  You may distribute the Program in non-source form, provided that you:
+  a. Include a copy of this License in the distribution.
+  b. Accompany it with a prominent notice stating that you have
+modified the Program.
+  c. Include a copy of the source code.
+
+  5. Accepting the License.
+
+  You accept this License by copying or distributing the Program.
+
+  6. Termination.
+
+  You may lose your license if you do not comply with the terms of this
+License. However, if you cure the violation within 30 days after
+you become aware of it, you will regain your license.
+
+  7. Warranty Disclaimer.
+
+  There is no warranty for the Program, and you are responsible for
+any issues that may arise from your use of it.
+
+  8. Limitation of Liability.
+
+  Under no circumstances shall the author or copyright holders be liable
+for any damage caused by the Program.
+
+  9. Interpretation.
+
+  This License shall be interpreted in accordance with the laws of
+the jurisdiction in which it was received.
+
+  10. Final Acceptance.
+
+  By copying, distributing, or modifying the Program, you indicate your
+acceptance of this License and its terms.
+
+                    END OF TERMS AND CONDITIONS
